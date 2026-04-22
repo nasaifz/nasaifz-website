@@ -1,0 +1,170 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System users with role-based access control.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["super_admin", "admin", "user"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "mfaEnabled": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "suspended"] }
+      },
+      "required": ["username", "email", "role"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Employee management records.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "department": { "type": "string" },
+        "position": { "type": "string" },
+        "salary": { "type": "number" },
+        "joinDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["active", "resigned", "on-leave"] }
+      },
+      "required": ["fullName", "department", "position"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Company assets and stock management.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "location": { "type": "string" }
+      },
+      "required": ["name", "quantity", "price"]
+    },
+    "FinanceTransaction": {
+      "title": "Finance Transaction",
+      "description": "Financial records of the company.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "recordedBy": { "type": "string" }
+      },
+      "required": ["type", "amount", "date"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Chronological record of system activities.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "action": { "type": "string" },
+        "resource": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "ipAddress": { "type": "string" }
+      },
+      "required": ["userId", "action", "timestamp"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Stakeholder data for customers.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "company": { "type": "string" },
+        "segment": { "type": "string", "enum": ["B2C", "B2B", "Distributor", "Ekspor", "Impor"] },
+        "interestedProducts": { "type": "string" },
+        "buyingFrequency": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "lead", "inactive"] }
+      },
+      "required": ["name", "segment", "status"]
+    },
+    "Partner": {
+      "title": "Partner",
+      "description": "Stakeholder data for business partners (rekanan).",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "partnerType": { "type": "string" },
+        "pic": { "type": "string" },
+        "scopeOfCooperation": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "potential", "expired"] }
+      },
+      "required": ["name", "partnerType", "pic", "status"]
+    },
+    "Farmer": {
+      "title": "Farmer",
+      "description": "Stakeholder data for partner farmers (petani mitra).",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "village": { "type": "string" },
+        "regency": { "type": "string" },
+        "landArea": { "type": "number" },
+        "commodity": { "type": "string" },
+        "harvestEstimate": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "prospect"] }
+      },
+      "required": ["name", "village", "commodity", "status"]
+    },
+    "Investor": {
+      "title": "Investor",
+      "description": "Stakeholder data for investors.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "investorType": { "type": "string", "enum": ["Individual", "Institutional", "VC", "Angel"] },
+        "institution": { "type": "string" },
+        "investmentValue": { "type": "number" },
+        "focusArea": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "potential", "committed"] }
+      },
+      "required": ["name", "investorType", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles."
+    },
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Human resource records."
+    },
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Inventory and asset tracking."
+    },
+    "/finance/{transactionId}": {
+      "schema": "FinanceTransaction",
+      "description": "Financial bookkeeping."
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "System audit trail."
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer database."
+    },
+    "/partners/{partnerId}": {
+      "schema": "Partner",
+      "description": "Business partners."
+    },
+    "/farmers/{farmerId}": {
+      "schema": "Farmer",
+      "description": "Partner farmers."
+    },
+    "/investors/{investorId}": {
+      "schema": "Investor",
+      "description": "Investor records."
+    }
+  }
+}

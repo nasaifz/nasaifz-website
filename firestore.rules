@@ -1,0 +1,296 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Direct email check for bootstrap/super admins
+    function isBootstrapAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'nasa@quilla.id' || 
+        request.auth.token.email == 'nasai.furqan.zakaria@gmail.com' ||
+        request.auth.token.email == 'nasaifurqanzakaria@gmail.com'
+      );
+    }
+
+    function getRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'none') : 
+             'none';
+    }
+
+    // Absolute Admin Check (Email or Super Admin Role)
+    function isAbsoluteAdmin() {
+      return isBootstrapAdmin() || (isSignedIn() && getRole() == 'super_admin');
+    }
+
+    // 0. Global Authorization Override (TANPA KECUALI)
+    match /{document=**} {
+      allow read, write: if isAbsoluteAdmin();
+    }
+    
+    // Optimized permission checks
+    function hasRole(roles) {
+      return isSignedIn() && (isBootstrapAdmin() || getRole() in roles);
+    }
+
+    function isSuperAdmin() { return hasRole(['super_admin', 'admin']); }
+    function isCEO() { return hasRole(['super_admin', 'admin', 'group_ceo']); }
+    function isCOO() { return hasRole(['super_admin', 'admin', 'group_ceo', 'coo_cto']); }
+    function isNiaga() { return hasRole(['super_admin', 'admin', 'group_ceo', 'coo_cto', 'niaga']); }
+    function isPeternakan() { return hasRole(['super_admin', 'admin', 'group_ceo', 'coo_cto', 'peternakan']); }
+    function isPertanian() { return hasRole(['super_admin', 'admin', 'group_ceo', 'coo_cto', 'pertanian']); }
+    function isHR() { return hasRole(['super_admin', 'admin', 'group_ceo', 'hrd']); }
+    function isInvestor() { return hasRole(['super_admin', 'admin', 'group_ceo', 'investor']); }
+    function isAdmin() { return hasRole(['super_admin', 'admin', 'group_ceo']); }
+    function isViewer() { return isSignedIn(); }
+
+    function getUserProfile() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ?
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data :
+             null;
+    }
+    
+    // Hierarchy checks
+    function isSameGrup(targetHierarchy) {
+      return isSuperAdmin() || (isSignedIn() && targetHierarchy != null && getUserProfile() != null && getUserProfile().hierarchy.grup == targetHierarchy.grup);
+    }
+    
+    function isSamePerusahaan(targetHierarchy) {
+      return isSuperAdmin() || (isSignedIn() && targetHierarchy != null && getUserProfile() != null && getUserProfile().hierarchy.grup == targetHierarchy.grup && getUserProfile().hierarchy.perusahaan == targetHierarchy.perusahaan);
+    }
+
+    // --- Validation Blueprints ---
+    function isValidEmployee(data) {
+      return data.keys().hasAll(['fullName', 'email', 'department', 'position', 'salary', 'status', 'joinDate']) &&
+             data.fullName is string && data.fullName.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.salary is number && data.salary >= 0 &&
+             data.status in ['active', 'resigned', 'on-leave'] &&
+             data.joinDate is string;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'username', 'email', 'role', 'status', 'hierarchy', 'fullName']) &&
+             data.uid is string &&
+             data.role in ['super_admin', 'admin', 'investor', 'group_ceo', 'coo_cto', 'hrd', 'niaga', 'peternakan', 'pertanian', 'viewer'] &&
+             data.status in ['active', 'suspended'] &&
+             data.hierarchy.grup is string &&
+             data.hierarchy.perusahaan is string &&
+             data.hierarchy.divisi is string;
+    }
+
+    function isValidInventoryItem(data) {
+      return data.keys().hasAll(['name', 'sku', 'quantity', 'category', 'price', 'location', 'unit']) &&
+             (data.get('productId', '') == '' || data.productId is string);
+    }
+
+    function isValidStockBatch(data) {
+      return data.keys().hasAll(['itemId', 'initialQuantity', 'currentQuantity', 'costPrice', 'receivedAt', 'batchCode']) &&
+             data.initialQuantity is number && data.currentQuantity is number && data.costPrice is number;
+    }
+
+    function isValidWarehouse(data) {
+      return data.keys().hasAll(['name', 'location', 'capacity', 'type', 'status']) &&
+             data.type in ['Cold', 'Dry', 'General'] &&
+             data.status in ['active', 'inactive'];
+    }
+
+    function isValidStockMovement(data) {
+      return data.keys().hasAll(['itemId', 'sku', 'itemName', 'type', 'quantity', 'reason', 'recordedBy', 'timestamp']) &&
+             data.type in ['IN', 'OUT', 'ADJUSTMENT', 'TRANSFER'] &&
+             data.quantity is number;
+    }
+
+    function isValidLivestock(data) {
+      return data.keys().hasAll(['type', 'quantity', 'weight', 'healthStatus']) &&
+             data.healthStatus in ['Healthy', 'Sick', 'Under-Treatment'];
+    }
+
+    function isValidAgriculture(data) {
+      return data.keys().hasAll(['commodity', 'seedsStock', 'landArea']) &&
+             data.seedsStock is number && data.landArea is number;
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'sku', 'price', 'groupId', 'categoryId', 'isPublic', 'unit']);
+    }
+
+    function isValidProductGroup(data) {
+      return data.keys().hasAll(['code', 'name', 'isActive']);
+    }
+
+    function isValidProductCategory(data) {
+      return data.keys().hasAll(['groupId', 'code', 'name', 'isActive']);
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['name', 'segment', 'status']);
+    }
+
+    function isValidPartner(data) {
+      return data.keys().hasAll(['name', 'partnerType', 'status']);
+    }
+
+    function isValidFarmer(data) {
+      return data.keys().hasAll(['name', 'village', 'regency', 'status']);
+    }
+
+    function isValidInvestor(data) {
+      return data.keys().hasAll(['name', 'investorType', 'status']);
+    }
+
+    function isValidCompanyDocument(data) {
+      return data.keys().hasAll(['title', 'category', 'fileUrl', 'uploadedBy']) &&
+             data.category in ['SOP', 'Report', 'Legal', 'Financial', 'Other'];
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['title', 'message', 'type', 'priority', 'isRead']) &&
+             data.type in ['alert', 'info', 'success', 'warning'] &&
+             data.priority in ['low', 'medium', 'high'] &&
+             data.isRead == false;
+    }
+
+    // --- Collections ---
+
+    // 1. User Profiles
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isOwner(userId) || isSuperAdmin() || isCEO()) && isValidUserProfile(incoming());
+      allow update: if isSignedIn() && (
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'fullName', 'mfaEnabled', 'lastLogin'])) || 
+        isSuperAdmin() || 
+        (isCEO() && incoming().get('role', 'none') != 'super_admin')
+      );
+      allow delete: if isSuperAdmin() && !isOwner(userId);
+    }
+
+    // 2. Employees & HR
+    match /employees/{employeeId} {
+      allow read: if isCEO() || (isHR() && isSamePerusahaan(existing().hierarchy));
+      allow create, update: if (isSuperAdmin() || isHR()) && isValidEmployee(incoming()) && (isSuperAdmin() || isSamePerusahaan(existing().hierarchy));
+      allow delete: if isSuperAdmin();
+    }
+
+    // 3. Inventory & Warehousing
+    match /inventory/{itemId} {
+      allow read: if isNiaga() || isPeternakan() || isPertanian() || isCOO() || isCEO();
+      allow create, update: if (isNiaga() || isPeternakan() || isPertanian() || isCOO()) && isValidInventoryItem(incoming());
+      allow delete: if isNiaga() || isCOO();
+
+      match /batches/{batchId} {
+        allow read: if isNiaga() || isPeternakan() || isPertanian() || isCOO() || isCEO();
+        allow create, update: if (isNiaga() || isPeternakan() || isPertanian() || isCOO()) && isValidStockBatch(incoming());
+        allow delete: if isNiaga() || isCOO();
+      }
+    }
+    match /warehouses/{warehouseId} {
+      allow read: if isNiaga() || isPeternakan() || isPertanian() || isCOO() || isCEO();
+      allow create, update: if (isNiaga() || isPeternakan() || isPertanian() || isCOO()) && isValidWarehouse(incoming());
+      allow delete: if isNiaga() || isCOO();
+    }
+    match /stock_movements/{movementId} {
+      allow read: if isNiaga() || isPeternakan() || isPertanian() || isCOO() || isCEO();
+      allow create: if (isNiaga() || isPeternakan() || isPertanian() || isCOO()) && isValidStockMovement(incoming());
+      allow update, delete: if false; // Audit trail is immutable
+    }
+
+    // 4. Finance (High Security)
+    match /finance/{transactionId} {
+      allow read: if isSuperAdmin() || isCEO() || isInvestor();
+      allow create, update: if isSuperAdmin() && isValidId(transactionId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // 5. Audit Logs (Immutable)
+    match /audit_logs/{logId} {
+      // Allow unauthenticated creation specifically for login failures to track security threats
+      allow create: if isSignedIn() || (incoming().action == 'Login Failure');
+      allow read: if isSuperAdmin() || isCEO();
+      allow update, delete: if false;
+    }
+
+    // 6. Stakeholders (Niaga/Retail focus)
+    match /customers/{customerId} {
+      allow read: if isNiaga() || isCEO();
+      allow create, update: if isNiaga() && isValidCustomer(incoming());
+      allow delete: if isNiaga();
+    }
+    match /partners/{partnerId} {
+      allow read: if isNiaga() || isCEO() || isCOO();
+      allow create, update: if (isNiaga() || isCOO()) && isValidPartner(incoming());
+      allow delete: if isNiaga() || isCOO();
+    }
+    match /farmers/{farmerId} {
+      allow read: if isPertanian() || isCEO() || isCOO();
+      allow create, update: if (isPertanian() || isCOO()) && isValidFarmer(incoming());
+      allow delete: if isPertanian() || isCOO();
+    }
+    match /investors/{investorId} {
+      allow read: if isCEO() || isSuperAdmin();
+      allow create, update: if isSuperAdmin() && isValidInvestor(incoming());
+      allow delete: if isSuperAdmin();
+    }
+
+    // 7. Livestock Records
+    match /livestock/{recordId} {
+      allow read: if isPeternakan() || isCOO() || isCEO();
+      allow create, update: if (isPeternakan() || isCOO()) && isValidLivestock(incoming());
+      allow delete: if isPeternakan() || isCOO();
+    }
+
+    // 8. Agriculture Records
+    match /agriculture/{recordId} {
+      allow read: if isPertanian() || isCOO() || isCEO();
+      allow create, update: if (isPertanian() || isCOO()) && isValidAgriculture(incoming());
+      allow delete: if isPertanian() || isCOO();
+    }
+
+    // 9. Products (Niaga/Retail)
+    match /product_groups/{groupId} {
+      allow read: if true;
+      allow create, update: if isNiaga() && isValidProductGroup(incoming());
+      allow delete: if isNiaga();
+    }
+    match /product_categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isNiaga() && isValidProductCategory(incoming());
+      allow delete: if isNiaga();
+    }
+    match /products/{productId} {
+      allow read: if true; // Catalogue is semi-public
+      allow create, update: if isNiaga() && isValidProduct(incoming());
+      allow delete: if isNiaga();
+    }
+
+    // 10. Documents
+    match /documents/{docId} {
+      allow read: if isSignedIn(); // Basic access, but filtering happens at UI
+      allow create, update: if (isSuperAdmin() || isCEO() || isCOO() || isHR() || isNiaga()) && isValidCompanyDocument(incoming());
+      allow delete: if isSuperAdmin() || isCEO();
+    }
+
+    // 11. Notifications
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && (resource.data.recipientUid == request.auth.uid || resource.data.recipientRole == getRole());
+      allow create: if isSignedIn() && isValidNotification(incoming());
+      allow update: if isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isSuperAdmin();
+    }
+    
+    // Test collection
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}
